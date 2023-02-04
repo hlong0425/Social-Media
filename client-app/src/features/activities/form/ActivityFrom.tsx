@@ -1,6 +1,9 @@
 import { observer } from 'mobx-react-lite'
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Form, Segment } from 'semantic-ui-react'
+import { v4 as uuid } from 'uuid';
+import { LoadingComponent } from '../../../app/layout/LoadingComponent';
 import { Activity } from '../../../app/models/activity';
 import { useStore } from '../../../app/stores/store';
 
@@ -16,9 +19,24 @@ const initialState = {
 
 const ActivityFrom = () => {
     const { activityStore } = useStore();
-    const { selectedActivity, closeForm, updateActivity, createActivity, loading } = activityStore;
+    const { updateActivity, createActivity, loading, loadActivity, loadingInitial } = activityStore;
+    const [activityValue, setActivityValue] = useState<Activity>(initialState);
+    const { id } = useParams();
+    const navigate = useNavigate();
 
-    const [activityValue, setActivityValue] = useState<Activity>(selectedActivity ?? initialState);
+    function handleSubmit() {
+        if (!activityValue.id) {
+            activityValue.id = uuid();
+            createActivity(activityValue).then(() => navigate(`/activities/${activityValue.id}`));
+        }
+        else {
+            updateActivity(activityValue).then(() => navigate(`/activities/${activityValue.id}`));
+        }
+    }
+
+    useEffect(() => {
+        if (id) loadActivity(id).then(activity => setActivityValue(activity ?? initialState))
+    }, [id, loadActivity]);
 
     function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
         const { name, value } = event.target;
@@ -27,18 +45,11 @@ const ActivityFrom = () => {
         })
     }
 
-    function handleSubmitForm() {
-        if (activityValue.id) {
-            updateActivity(activityValue);
-        }
-        else {
-            createActivity(activityValue);
-        }
-    }
+    if (loadingInitial) return <LoadingComponent content='Loading activity...' />
 
     return (
         <Segment clearing>
-            <Form onSubmit={handleSubmitForm} autoComplete='off'>
+            <Form onSubmit={handleSubmit} autoComplete='off'>
                 <Form.Input placeholder='Title' value={activityValue?.title} name='title' onChange={handleInputChange} />
                 <Form.TextArea placeholder='Description' value={activityValue?.description} name='description' onChange={handleInputChange} />
                 <Form.Input placeholder='Category' name='category' value={activityValue?.category} onChange={handleInputChange} />
@@ -46,7 +57,7 @@ const ActivityFrom = () => {
                 <Form.Input placeholder='City' name='city' value={activityValue?.city} onChange={handleInputChange} />
                 <Form.Input placeholder='Venue' name='venue' value={activityValue?.venue} onChange={handleInputChange} />
                 <Button loading={loading} floated='right' positive type='submit' content='Submit' />
-                <Button onClick={closeForm} floated='right' type='button' content='Cancel'></Button>
+                <Button floated='right' type='button' content='Cancel'></Button>
             </Form>
         </Segment>
     )

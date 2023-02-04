@@ -22,13 +22,12 @@ export default class ActivityStore {
   }
 
   loadActivities = async () => {
+    this.setLoadingInitial(true);
     try {
       const activities = await agent.Activities.list();
-
       runInAction(() => {
         activities.forEach((activity) => {
-          activity.date = activity.date.split("T")[0];
-          this.activityRegistry.set(activity.id, activity);
+          this.setActivity(activity);
         });
       });
     } catch (error) {
@@ -42,21 +41,28 @@ export default class ActivityStore {
     this.loadingInitial = state;
   };
 
-  selectActivity = (id: string) => {
-    // this.selectedActivity = this.activities.find((act) => act.id === id);
-    this.selectedActivity = this.activityRegistry.get(id);
+  loadActivity = async (id: string) => {
+    let activity = this.getActivity(id);
+    if (activity) {
+      this.selectedActivity = activity;
+      return activity;
+    } else {
+      this.setLoadingInitial(true);
+      try {
+        activity = await agent.Activities.details(id);
+        this.setActivity(activity);
+        runInAction(() => (this.selectedActivity = activity));
+        this.setLoadingInitial(false);
+        return activity;
+      } catch (error) {
+        console.log(error);
+        this.setLoadingInitial(false);
+      }
+    }
   };
 
-  cancelSelectedActivity = (id?: string) => {
-    this.selectedActivity = undefined;
-  };
-
-  closeForm = () => {
-    this.editMode = false;
-  };
-
-  openForm = () => {
-    this.editMode = true;
+  private getActivity = (id: string) => {
+    return this.activityRegistry.get(id);
   };
 
   createActivity = async (activity: Activity) => {
@@ -109,7 +115,6 @@ export default class ActivityStore {
       runInAction(() => {
         // this.activities = [...this.activities.filter((a) => a.id !== id)];
         this.activityRegistry.delete(id);
-        if (this.selectedActivity?.id === id) this.cancelSelectedActivity();
         this.loading = false;
       });
     } catch (error) {
@@ -117,6 +122,13 @@ export default class ActivityStore {
       runInAction(() => {
         this.loading = false;
       });
+    }
+  };
+
+  private setActivity = (activity: Activity | undefined) => {
+    if (activity) {
+      activity.date = activity.date.split("T")[0];
+      this.activityRegistry.set(activity.id, activity);
     }
   };
 }
